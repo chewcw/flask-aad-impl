@@ -5,7 +5,7 @@ from pathlib import Path
 from flask_azure_oauth import FlaskAzureOauth
 
 # environment file
-load_dotenv(dotenv_path='.env')
+load_dotenv()
 
 # application
 app = Flask(__name__)
@@ -29,7 +29,7 @@ def protected():
     return 'hahahaah, this is protected route without scope specified'
 
 @app.route('/api/all')
-@auth('all')
+@auth('All.Information')
 def test():
 	return 'hahahahah, this is protected route with scope `all` specified'
 
