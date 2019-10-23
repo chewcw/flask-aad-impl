@@ -1,0 +1,170 @@
+<html>
+
+<head>
+	<title>Calling a Web API as a user authenticated with Msal.js app</title>
+	<style>
+		.hidden {
+			visibility: hidden
+		}
+
+		.visible {
+			visibility: visible
+		}
+
+		.response {
+			border: solid;
+			border-width: thin;
+			background-color: azure;
+			padding: 2px;
+		}
+	</style>
+</head>
+
+<body>
+	<!-- bluebird only needed if this page needs to run on Internet Explorer -->
+	<!-- msal.min.js can be used in the place of msal.js; included msal.js to make debug easy -->
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/bluebird/3.3.4/bluebird.min.js" class="pre"></script>
+	<script src="https://secure.aadcdn.microsoftonline-p.com/lib/1.1.2/js/msal.js"></script>
+	<script src="https://code.jquery.com/jquery-3.2.1.min.js" class="pre"></script>
+
+	<div>
+		<button id="auth" onclick="signIn()">Login</button>
+		
+		<div>
+			<h1>
+				Your access token is: 
+			</h1>
+
+			<br/>
+
+			<div id="accessToken"></div>
+		</div>
+		
+	</div>
+
+	<script class="pre">
+
+		// The current application coordinates were pre-registered in a B2C tenant.
+		var appConfig = {
+			// b2cScopes: ["https://fabrikamb2c.onmicrosoft.com/helloapi/demo.read"],
+			scopes: ["api://f42f0ca9-4bc7-4c55-b436-c5e8a8179832/All.Information"],
+			// webApi: "https://fabrikamb2chello.azurewebsites.net/hello"
+		};
+
+	</script>
+
+	<script>
+		"use strict";
+
+		// configuration to initialize msal
+		const msalConfig = {
+			auth: {
+				clientId: "3478b33e-fc9c-49cb-8b40-7f955aaeaa60", //This is your client ID
+				authority: "https://login.microsoftonline.com/lecustomeraccess.onmicrosoft.com", //This is your tenant info
+				validateAuthority: false
+			},
+			cache: {
+				cacheLocation: "localStorage",
+				storeAuthStateInCookie: true
+			}
+		};
+
+		// instantiate MSAL
+		const myMSALObj = new Msal.UserAgentApplication(msalConfig);
+
+		// request to signin - returns an idToken
+		const loginRequest = {
+			scopes: appConfig.scopes
+		};
+
+		// request to acquire a token for resource access
+		const tokenRequest = {
+			scopes: appConfig.scopes
+		};
+
+		// signin and acquire a token silently with POPUP flow. Fall back in case of failure with silent acquisition to popup
+		function signIn() {
+			myMSALObj.loginPopup(loginRequest).then(function (loginResponse) {
+				// getToken(tokenRequest).then(updateUI);
+				getToken(tokenRequest)
+					.then(tokenResponse => {
+						console.log(tokenResponse.accessToken);
+						let divAccessToken = document.getElementById("accessToken");
+						divAccessToken.innerText = tokenResponse.accessToken;
+					})
+			}).catch(function (error) {
+				logMessage(error);
+			});
+		}
+
+		//acquire a token silently
+		function getToken(tokenRequest) {
+			return myMSALObj.acquireTokenSilent(tokenRequest).catch(function (error) {
+				console.log("aquire token popup");
+				// fallback to interaction when silent call fails
+				return myMSALObj.acquireTokenPopup(tokenrequest).then(function (tokenResponse) {
+				}).catch(function (error) {
+					logMessage("Failed token acquisition", error);
+				});
+			});
+		}
+
+		// updates the UI post login/token acqusition
+		function updateUI() {
+			const userName = myMSALObj.getAccount().name;
+			console.log(myMSALObj.getAccount());
+			logMessage("User '" + userName + "' logged-in");
+
+			// add the logout button
+			const authButton = document.getElementById('auth');
+			authButton.innerHTML = 'logout';
+			authButton.setAttribute('onclick', 'logout();');
+
+			// greet the user - specifying login
+			const label = document.getElementById('label');
+			label.innerText = "Hello " + userName;
+
+			// add the callWebApi button
+			const callWebApiButton = document.getElementById('callApiButton');
+			callWebApiButton.setAttribute('class', 'visible');
+		}
+
+		// calls the resource API with the token
+		function callApi() {
+			getToken(tokenRequest).then(function (tokenResponse) {
+				callApiWithAccessToken(tokenResponse.accessToken);
+			});
+		}
+
+		// helper function to access the resource with the token
+		function callApiWithAccessToken(accessToken) {
+			// Call the Web API with the AccessToken
+			$.ajax({
+				type: "GET",
+				url: appConfig.webApi,
+				headers: {
+					'Authorization': 'Bearer ' + accessToken,
+				},
+			}).done(function (data) {
+				logMessage("Web APi returned:\n" + JSON.stringify(data));
+			})
+				.fail(function (jqXHR, textStatus) {
+					logMessage("Error calling the Web api:\n" + textStatus);
+				})
+		}
+
+		// signout the user
+		function logout() {
+			// Removes all sessions, need to call AAD endpoint to do full logout
+			myMSALObj.logout();
+		}
+
+		// debug helper
+		function logMessage(s) {
+			document.body.querySelector('.response').appendChild(document.createTextNode('\n' + s));
+		}
+
+	</script>
+</body>
+
+</html>
